@@ -1,4 +1,5 @@
 from django.db import models
+from accounts.models import User
 
 class Recipe(models.Model):
     title = models.CharField(max_length=100)
@@ -8,6 +9,7 @@ class Recipe(models.Model):
     equipment = models.TextField()
     instructions = models.TextField()
     tips = models.TextField
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return f" Title: {self.title}"

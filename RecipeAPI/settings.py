@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-wigyme5#yav$=@^ct*rpordcdwpo1d*u)^25ge4wh2sl+j+9@m
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'recipe',
     'rest_framework',
+    'accounts',
+    'rest_framework.authtoken'
 ]
 
 MIDDLEWARE = [
@@ -130,3 +132,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# settings.py
+AUTH_USER_MODEL = 'accounts.User'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.BasicAuthentication',
+    ]
+}
