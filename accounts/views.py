@@ -1,11 +1,14 @@
 from django.shortcuts import render
 from .models import User
-from .serializers import RegisterUserSerializers
+from .serializers import RegisterUserSerializers, UserSerializer
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.shortcuts import redirect
 from django.contrib.auth import authenticate
+
 
 # Create your views here.
 
@@ -40,3 +43,16 @@ class LoginView(APIView):
                     "message" : "Invalid credentials"
                 }, status = status.HTTP_400_BAD_REQUEST
             )
+        
+class UsersView(ListAPIView):
+    permission_classes = [IsAdminUser]
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+class UserProfileView(RetrieveAPIView):
+   permission_classes = [IsAuthenticated]
+
+   def get(self, request):
+       serializer = UserSerializer(request.user)
+       return Response(serializer.data)
+    
