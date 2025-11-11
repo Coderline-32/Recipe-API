@@ -5,7 +5,6 @@ class Recipe(models.Model):
     title = models.CharField(max_length=100)
     serving_size = models.CharField(max_length=100)
     cook_time = models.CharField(max_length=100)
-    ingredients = models.TextField()
     equipment = models.TextField()
     instructions = models.TextField()
     tips = models.TextField
@@ -16,3 +15,9 @@ class Recipe(models.Model):
 
     def __str__(self):
         return f" Title: {self.title}"
+
+class Ingredients(models.Model):
+    name = models.CharField(max_length=15)
+    quantity = models.CharField(max_length=15)
+    unit = models.CharField(max_length=15)
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name="ingredients")
