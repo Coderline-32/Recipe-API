@@ -14,10 +14,11 @@ class IngredientsSerializer(serializers.ModelSerializer):
 
 class RecipeSerializers(serializers.ModelSerializer):
     ingredients = IngredientsSerializer(many=True)
+    user_username = serializers.CharField(source="user.username", read_only=True)
 
     class Meta:
         model = Recipe
-        fields = ['id', 'title', 'serving_size', 'cook_time', 'equipment', 'instructions', 'tips', 'user', 'created_at', 'ingredients']
+        fields = ['id', 'title', 'serving_size', 'cook_time', 'equipment', 'instructions', 'tips', 'user_username', 'created_at', 'ingredients']
         read_only_fields = ['user', 'created_at']
     
 

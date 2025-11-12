@@ -16,6 +16,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework import status
+from rest_framework import filters
+
 
 
 class RecipeCreateView(generics.CreateAPIView):
@@ -63,6 +65,11 @@ class RecipeCreateView(generics.CreateAPIView):
 class RecipeListView(generics.ListAPIView):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializers
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'cook_time', 'serving_size', 'user__username']
+    ordering_fields = ['created_at', 'cook_time']
+
+
 
 class IngredientsListView(generics.ListAPIView):
     queryset = Ingredients.objects.all()
