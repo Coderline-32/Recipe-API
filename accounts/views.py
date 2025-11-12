@@ -7,7 +7,7 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.shortcuts import redirect
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login, logout
 
 
 # Create your views here.
@@ -33,6 +33,7 @@ class LoginView(APIView):
 
         user = authenticate (request, username = username, password = password)
         if user:
+            login(request, user)
             return Response(
                 {"message" : "Login Succesful"}, status = status.HTTP_200_OK
             )
@@ -55,4 +56,13 @@ class UserProfileView(RetrieveAPIView):
    def get(self, request):
        serializer = UserSerializer(request.user)
        return Response(serializer.data)
-    
+
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logout(request)
+        return Response({'message':'Logout succesful'}, status = status.HTTP_200_OK
+        )

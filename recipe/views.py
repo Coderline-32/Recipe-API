@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from .models import Recipe, Ingredients
-from .serializers import RecipeSerializers
+from .serializers import RecipeSerializers, IngredientsSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import generics
@@ -40,11 +40,21 @@ class RecipeListView(generics.ListAPIView):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializers
 
+class IngredientsListView(generics.ListAPIView):
+    queryset = Ingredients.objects.all()
+    serializer_class = IngredientsSerializer
 
-        
+       
 class RecipeDetailView(generics.RetrieveAPIView):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializers
+
+
+class IngredientDetailView(generics.RetrieveAPIView):
+    queryset = Recipe.objects.all()
+    serializer_class = IngredientsSerializer
+
+
 
 class RecipeDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
@@ -55,4 +65,10 @@ class RecipeDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
         return Recipe.objects.filter(user = self.request.user)
 
 
+class IngredientDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Ingredients.objects.all()
+    serializer_class = IngredientsSerializer
 
+    def get_query(self):
+        return Ingredients.objects.filter(self.request.user.recipe)

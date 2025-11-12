@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'recipe',
     'rest_framework',
     'accounts',
-    'rest_framework.authtoken'
+    'rest_framework.authtoken',
+    
 ]
 
 MIDDLEWARE = [
@@ -137,7 +138,7 @@ AUTH_USER_MODEL = 'accounts.User'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     
 }
