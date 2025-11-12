@@ -1,6 +1,16 @@
 from django.shortcuts import render
-from .models import Recipe, Ingredients, Favourites
-from .serializers import RecipeSerializers, IngredientsSerializer, FavouritesSerializer
+from .models import(
+    Recipe,
+    Ingredients, 
+    Favourites,
+    Comments
+)
+from .serializers import(
+    RecipeSerializers, 
+    IngredientsSerializer, 
+    FavouritesSerializer,
+    CommentsSerializer
+)
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -88,6 +98,7 @@ class IngredientDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
         return Ingredients.objects.filter(self.request.user.recipe)
 
 class FavouritesView(APIView):
+    permission_classes = [IsAuthenticated]
     def post(self, request, recipe_id):
         try:
             recipe = Recipe.objects.get(id=recipe_id)
@@ -124,5 +135,55 @@ class FavouritesView(APIView):
         )
 
 class FavouritesListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     queryset = Favourites.objects.all()
     serializer_class = FavouritesSerializer
+
+
+class CommentsView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, recipe_id):
+
+        try:
+            recipe = Recipe.objects.get(id=recipe_id)
+        except Recipe.DoesNotExist:
+            return Response(
+                {'error':'Recipe does not exists'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        comment_text = request.data.get('comment_text')
+        rating = request.data.get('rating') 
+
+
+        comment = Comments.objects.create(
+            user=request.user, 
+            recipe=recipe,
+            comment_text = comment_text,
+            rating = rating
+            
+            )
+        serializer = CommentsSerializer(comment)
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED
+        )
+    
+class CommentsListView(APIView):
+    def get(self, request, recipe_id):
+
+        try:
+            recipe = Recipe.objects.get(id=recipe_id)
+        except Recipe.DoesNotExist:
+            return Response(
+                {'error':'Recipe does not exists'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        recipe_comments= Comments.objects.filter(recipe=recipe)
+        serializer = CommentsSerializer(recipe_comments, many=True)
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK
+        )

@@ -1,5 +1,7 @@
 from django.db import models
 from accounts.models import User
+from django.core.validators import MinValueValidator, MaxValueValidator
+
 
 class Recipe(models.Model):
     title = models.CharField(max_length=100)
@@ -24,8 +26,8 @@ class Ingredients(models.Model):
 
 
 class Favourites(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_id')
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='recipe_id')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favourites')  # unique reverse name
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='favourite_recipes')
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
@@ -33,3 +35,16 @@ class Favourites(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.recipe.title}"
+
+
+class Comments(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')  # unique reverse name
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='comments_on_recipe')
+    comment_text = models.TextField()
+    rating = models.PositiveIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.recipe.title} ({self.rating})"

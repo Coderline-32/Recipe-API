@@ -8,7 +8,9 @@ from .views import (
     IngredientDetailView,
     IngredientDetailUpdateView,
     FavouritesView,
-    FavouritesListView
+    FavouritesListView,
+    CommentsView,
+    CommentsListView
 )
 
 urlpatterns = [
@@ -20,7 +22,9 @@ urlpatterns = [
     path('ingredient/detail/<int:pk>/', IngredientDetailView.as_view(), name='recipe_detail' ),
     path('ingredient/detail-u/<int:pk>/', IngredientDetailUpdateView.as_view(), name='recipe_detail' ),
     path('favourites/<int:recipe_id>/', FavouritesView.as_view(), name='favourites'),
-    path('favourites/list/', FavouritesListView.as_view(), name='favourites_list')
+    path('favourites/list/', FavouritesListView.as_view(), name='favourites_list'),
+    path('comment/create/<int:recipe_id>/', CommentsView.as_view(), name='comment_create'),
+    path('comment/list/<int:recipe_id>/', CommentsListView.as_view(), name='comment_list')
 
    
     
