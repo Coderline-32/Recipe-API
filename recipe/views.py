@@ -17,52 +17,91 @@ from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework import status
 from rest_framework import filters
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import AllowAny
+from django.db import transaction
+
 
 
 
 class RecipeCreateView(generics.CreateAPIView):
-    serializer_class = RecipeSerializers  # used only for validation/output
+
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-    # Extract recipe fields from request
-        title = request.data.get("title")
-        serving_size = request.data.get("serving_size")
-        cook_time = request.data.get("cook_time")
-        equipment = request.data.get("equipment", "")
-        instructions = request.data.get("instructions", "")
-        tips = request.data.get("tips", "")
-        ingredients_data = request.data.get("ingredients", [])
+        try:
+            # Validate required fields
+            required_fields = ['title', 'serving_size', 'cook_time', 'equipment', 'instructions', 'tips', 'ingredients']
+            missing = [field for field in required_fields if not request.data.get(field)]
 
-    # Create recipe linked to current user
-        recipe = Recipe.objects.create(
-            title=title,
-            serving_size=serving_size,
-            cook_time=cook_time,
-            equipment=equipment,
-            instructions=instructions,
-            tips=tips,
-            user=request.user
-        )
+            if missing:
+                return Response(
+                    {"error": f"Missing required fields: {', '.join(missing)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-    # Create ingredients linked to the recipe
-        for ingredient in ingredients_data:
-            Ingredients.objects.create(
-                recipe=recipe,
-                name=ingredient.get("name", ""),
-                quantity=ingredient.get("quantity", ""),
-                unit=ingredient.get("unit", "")
+            title = request.data.get("title")
+            serving_size = request.data.get("serving_size")
+            cook_time = request.data.get("cook_time")
+            equipment = request.data.get("equipment", "")
+            instructions = request.data.get("instructions", "")
+            tips = request.data.get("tips", "")
+            ingredients_data = request.data.get("ingredients", [])
+
+            # Validate ingredients list format
+            if not isinstance(ingredients_data, list):
+                return Response(
+                    {"error": "Ingredients must be a list."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Optional: Validate ingredient structure
+            for item in ingredients_data:
+                if not isinstance(item, dict) or "name" not in item:
+                    return Response(
+                        {"error": "Each ingredient must be an object with at least a 'name' field."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Create recipe and ingredients safely
+            with transaction.atomic():
+                recipe = Recipe.objects.create(
+                    title=title,
+                    serving_size=serving_size,
+                    cook_time=cook_time,
+                    equipment=equipment,
+                    instructions=instructions,
+                    tips=tips,
+                    user=request.user
+                )
+
+                # Create ingredient entries
+                for ing in ingredients_data:
+                    Ingredients.objects.create(
+                        recipe=recipe,
+                        name=ing.get("name"),
+                        quantity=ing.get("quantity", ""),
+                        unit=ing.get("unit", "")
+                    )
+
+            return Response(
+                {
+                    "message": "Recipe created successfully.",
+                    "recipe_id": recipe.id
+                },
+                status=status.HTTP_201_CREATED
             )
 
-    # Serialize the recipe for response
-        serializer = self.get_serializer(recipe)
-       
-        return Response(
-                {"message": "Recipe created successfully", "recipe": serializer.data},
-                status=status.HTTP_201_CREATED
-            ) 
+        except Exception as e:
+            # Return a readable error instead of crashing
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
 class RecipeListView(generics.ListAPIView):
+    permission_classes = [AllowAny]
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializers
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -88,6 +127,7 @@ class IngredientDetailView(generics.RetrieveAPIView):
 
 
 class RecipeDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializers
@@ -97,6 +137,7 @@ class RecipeDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class IngredientDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     queryset = Ingredients.objects.all()
     serializer_class = IngredientsSerializer
@@ -104,10 +145,14 @@ class IngredientDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
     def get_query(self):
         return Ingredients.objects.filter(self.request.user.recipe)
 
-class FavouritesView(APIView):
+class FavouritesCreateView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     def post(self, request, recipe_id):
+        
         try:
+            
+            
             recipe = Recipe.objects.get(id=recipe_id)
         
         except Recipe.DoesNotExist:
@@ -142,12 +187,19 @@ class FavouritesView(APIView):
         )
 
 class FavouritesListView(generics.ListAPIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    queryset = Favourites.objects.all()
-    serializer_class = FavouritesSerializer
+    def get(self, request):
+        favorites = Favourites.objects.filter(user=request.user)
+        serializer = FavouritesSerializer(favorites, many=True)
+        return Response(
+            serializer.data,
+            status= status.HTTP_200_OK
+        )
 
 
 class CommentsView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     def post(self, request, recipe_id):
 

@@ -11,6 +11,14 @@ class RegisterUserSerializers(serializers.ModelSerializer):
         fields = ['username', 'email', 'password', 'password2']
 
     def validate(self, attrs):
+        missing_fields = [field for field in self.fields if field not in attrs or not attrs[field]]
+        
+        if missing_fields:
+            # Build a readable error message
+            raise serializers.ValidationError({
+                "missing_fields": [f"{field} is required" for field in missing_fields]
+            })
+
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password":"Passwords don't match!"})
         return attrs

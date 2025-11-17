@@ -9,7 +9,8 @@ from .models import (
 class IngredientsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ingredients
-        fields = ['name', 'quantity', 'unit', 'recipe']
+        fields = ['name', 'quantity', 'unit']
+       
 
 
 class RecipeSerializers(serializers.ModelSerializer):
@@ -21,14 +22,14 @@ class RecipeSerializers(serializers.ModelSerializer):
         fields = ['id', 'title', 'serving_size', 'cook_time', 'equipment', 'instructions', 'tips', 'user_username', 'created_at', 'ingredients']
         read_only_fields = ['user', 'created_at']
     
-
+    
 
 class FavouritesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Favourites
 
-        fields = ['id', 'user', 'recipe', 'created_at']
-        read_only_fields = ["id", "user", "created_at"]
+        fields = [ 'recipe', 'user', 'created_at']
+        read_only_fields = ["user", "created_at"]
 
 class CommentsSerializer(serializers.ModelSerializer):
     class Meta:
