@@ -9,6 +9,7 @@ from .views import (
     IngredientDetailUpdateView,
     FavouritesCreateView,
     FavouritesListView,
+    FavouritesUpdateDeleteView,
     CommentsView,
     CommentsListView
 )
@@ -23,8 +24,9 @@ urlpatterns = [
     path('ingredient/detail-u/<int:pk>/', IngredientDetailUpdateView.as_view(), name='recipe_detail' ),
     path('favourites/<int:recipe_id>/', FavouritesCreateView.as_view(), name='favourites'),
     path('favourites/list/', FavouritesListView.as_view(), name='favourites_list'),
+    path('favourites/update-delete/<int:pk>/', FavouritesUpdateDeleteView.as_view(), name='favourites_update_delete'),
     path('comment/create/<int:recipe_id>/', CommentsView.as_view(), name='comment_create'),
-    path('comment/list/<int:recipe_id>/', CommentsListView.as_view(), name='comment_list')
+    path('comment/list/<int:recipe_id>/', CommentsListView.as_view(), name='comment_list'),
 
    
     

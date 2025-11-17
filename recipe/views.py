@@ -196,7 +196,14 @@ class FavouritesListView(generics.ListAPIView):
             serializer.data,
             status= status.HTTP_200_OK
         )
-
+class FavouritesUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = FavouritesSerializer
+    
+    def get_queryset(self):
+        # Use the current logged-in user
+        return Favourites.objects.filter(user=self.request.user)
 
 class CommentsView(APIView):
     authentication_classes = [JWTAuthentication]

@@ -28,8 +28,8 @@ class FavouritesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Favourites
 
-        fields = [ 'recipe', 'user', 'created_at']
-        read_only_fields = ["user", "created_at"]
+        fields = [ 'id', 'recipe', 'user', 'created_at']
+        read_only_fields = ['id', "user", "created_at"]
 
 class CommentsSerializer(serializers.ModelSerializer):
     class Meta:
