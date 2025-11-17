@@ -208,7 +208,7 @@ class FavouritesUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 class CommentsView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    def post(self, request, recipe_id):
+    def post(self, request, recipe_id, *args, **kwargs):
 
         try:
             recipe = Recipe.objects.get(id=recipe_id)
@@ -217,10 +217,22 @@ class CommentsView(APIView):
                 {'error':'Recipe does not exists'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-        comment_text = request.data.get('comment_text')
-        rating = request.data.get('rating') 
+        required_fields = ['comment_text', 'rating']
+        missing = [field for field in required_fields if not request.data.get(field)]
 
+        if missing:
+            return Response(
+                    {"error": f"Missing required fields: {', '.join(missing)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+       
+
+       
+        comment_text = request.data.get('comment_text')
+        rating = request.data.get('rating')
+            
+        
 
         comment = Comments.objects.create(
             user=request.user, 
@@ -253,3 +265,12 @@ class CommentsListView(APIView):
             serializer.data,
             status=status.HTTP_200_OK
         )
+    
+class CommentsUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommentsSerializer
+    
+    def get_queryset(self):
+        # Use the current logged-in user
+        return Favourites.objects.filter(user=self.request.user)

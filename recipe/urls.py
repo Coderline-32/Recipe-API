@@ -11,7 +11,8 @@ from .views import (
     FavouritesListView,
     FavouritesUpdateDeleteView,
     CommentsView,
-    CommentsListView
+    CommentsListView,
+    CommentsUpdateDeleteView,
 )
 
 urlpatterns = [
@@ -26,7 +27,8 @@ urlpatterns = [
     path('favourites/list/', FavouritesListView.as_view(), name='favourites_list'),
     path('favourites/update-delete/<int:pk>/', FavouritesUpdateDeleteView.as_view(), name='favourites_update_delete'),
     path('comment/create/<int:recipe_id>/', CommentsView.as_view(), name='comment_create'),
-    path('comment/list/<int:recipe_id>/', CommentsListView.as_view(), name='comment_list'),
+    path('comments/list/<int:recipe_id>/', CommentsListView.as_view(), name='comment_list'),
+    path('comment/update-delete/<int:pk>/', CommentsUpdateDeleteView.as_view(), name='comment_update_delete'),
 
    
     
