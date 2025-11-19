@@ -300,6 +300,10 @@ CACHES = {
 # ============================================================================
 # LOGGING CONFIGURATION
 # ============================================================================
+# Create logs directory if it doesn't exist
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -330,7 +334,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
+            'filename': LOGS_DIR / 'django.log',
             'maxBytes': 1024 * 1024 * 5,  # 5MB
             'backupCount': 5,
             'formatter': 'verbose',
