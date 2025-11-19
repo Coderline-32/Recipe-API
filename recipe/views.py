@@ -1,276 +1,384 @@
-from django.shortcuts import render
-from .models import(
-    Recipe,
-    Ingredients, 
-    Favourites,
-    Comments
-)
-from .serializers import(
-    RecipeSerializers, 
-    IngredientsSerializer, 
-    FavouritesSerializer,
-    CommentsSerializer
-)
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets, status, views
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import generics
-from rest_framework import status
-from rest_framework import filters
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.permissions import AllowAny
-from django.db import transaction
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from django.shortcuts import get_object_or_404
+from django.db.models import Q, Avg, F
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+
+from .models import Recipe, Ingredient, Tag, Comment, Rating, RecipeImage, RecipeVersion
+from .serializers import (
+    RecipeListSerializer,
+    RecipeDetailSerializer,
+    RecipeCreateUpdateSerializer,
+    IngredientSerializer,
+    TagSerializer,
+    CommentSerializer,
+    RatingSerializer,
+    RecipeImageSerializer,
+    RecipeVersionSerializer,
+    RecipeScalePreviewSerializer,
+)
+from .permissions import (
+    IsRecipeAuthorOrReadOnly,
+    IsPublicOrAuthor,
+    CanCommentOrReadOnly,
+    CanRateRecipe,
+    CanManageRecipes,
+)
+from users.models import Notification
 
 
+class StandardResultsSetPagination(PageNumberPagination):
+    """Standard pagination for list endpoints."""
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
-class RecipeCreateView(generics.CreateAPIView):
-
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def create(self, request, *args, **kwargs):
-        try:
-            # Validate required fields
-            required_fields = ['title', 'serving_size', 'cook_time', 'equipment', 'instructions', 'tips', 'ingredients']
-            missing = [field for field in required_fields if not request.data.get(field)]
-
-            if missing:
-                return Response(
-                    {"error": f"Missing required fields: {', '.join(missing)}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            title = request.data.get("title")
-            serving_size = request.data.get("serving_size")
-            cook_time = request.data.get("cook_time")
-            equipment = request.data.get("equipment", "")
-            instructions = request.data.get("instructions", "")
-            tips = request.data.get("tips", "")
-            ingredients_data = request.data.get("ingredients", [])
-
-            # Validate ingredients list format
-            if not isinstance(ingredients_data, list):
-                return Response(
-                    {"error": "Ingredients must be a list."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Optional: Validate ingredient structure
-            for item in ingredients_data:
-                if not isinstance(item, dict) or "name" not in item:
-                    return Response(
-                        {"error": "Each ingredient must be an object with at least a 'name' field."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-            # Create recipe and ingredients safely
-            with transaction.atomic():
-                recipe = Recipe.objects.create(
-                    title=title,
-                    serving_size=serving_size,
-                    cook_time=cook_time,
-                    equipment=equipment,
-                    instructions=instructions,
-                    tips=tips,
-                    user=request.user
-                )
-
-                # Create ingredient entries
-                for ing in ingredients_data:
-                    Ingredients.objects.create(
-                        recipe=recipe,
-                        name=ing.get("name"),
-                        quantity=ing.get("quantity", ""),
-                        unit=ing.get("unit", "")
-                    )
-
-            return Response(
-                {
-                    "message": "Recipe created successfully.",
-                    "recipe_id": recipe.id
-                },
-                status=status.HTTP_201_CREATED
-            )
-
-        except Exception as e:
-            # Return a readable error instead of crashing
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-class RecipeListView(generics.ListAPIView):
+class TagViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for listing and filtering tags.
+    """
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
     permission_classes = [AllowAny]
-    queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializers
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['title', 'cook_time', 'serving_size', 'user__username']
-    ordering_fields = ['created_at', 'cook_time']
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    lookup_field = 'slug'
 
 
-
-class IngredientsListView(generics.ListAPIView):
-    queryset = Ingredients.objects.all()
-    serializer_class = IngredientsSerializer
-
-       
-class RecipeDetailView(generics.RetrieveAPIView):
-    queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializers
-
-
-class IngredientDetailView(generics.RetrieveAPIView):
-    queryset = Recipe.objects.all()
-    serializer_class = IngredientsSerializer
-
+class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for listing ingredients (read-only).
+    Ingredients are created/updated through recipes.
+    """
+    queryset = Ingredient.objects.all()
+    serializer_class = IngredientSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['name', 'type']
+    ordering_fields = ['name', 'type', 'created_at']
+    ordering = ['name']
+    pagination_class = StandardResultsSetPagination
 
 
-class RecipeDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializers
+class CommentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for recipe comments.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [CanCommentOrReadOnly]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [OrderingFilter]
+    ordering = ['-created_at']
 
-    def get_query(self):
-        return Recipe.objects.filter(user = self.request.user)
-
-
-class IngredientDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    queryset = Ingredients.objects.all()
-    serializer_class = IngredientsSerializer
-
-    def get_query(self):
-        return Ingredients.objects.filter(self.request.user.recipe)
-
-class FavouritesCreateView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    def post(self, request, recipe_id):
-        
-        try:
-            
-            
-            recipe = Recipe.objects.get(id=recipe_id)
-        
-        except Recipe.DoesNotExist:
-            return Response(
-                {'message': 'Recipe does not exist'},
-                status = status.HTTP_404_NOT_FOUND
-                )
-        fav,created = Favourites.objects.get_or_create(user=request.user, recipe=recipe)
-
-        if not created:
-            return Response(
-                {'message':'Recipe already in favourites'},
-                status = status.HTTP_200_OK
-            )
-        serializer = FavouritesSerializer(fav)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    def delete(self, request, recipe_id):
-        try:
-            recipe = Favourites.objects.get(user=request.user, recipe_id=recipe_id)
-        
-        except Favourites.DoesNotExist:
-            return Response(
-                {'message':'Recipe not in favourites'},
-                status = status.HTTP_404_NOT_FOUND
-            )
-        recipe.delete()
-        return Response(
-            {
-            'message':'recipe deleted'
-        },
-        status = status.HTTP_200_OK
-        )
-
-class FavouritesListView(generics.ListAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    def get(self, request):
-        favorites = Favourites.objects.filter(user=request.user)
-        serializer = FavouritesSerializer(favorites, many=True)
-        return Response(
-            serializer.data,
-            status= status.HTTP_200_OK
-        )
-class FavouritesUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    serializer_class = FavouritesSerializer
-    
     def get_queryset(self):
-        # Use the current logged-in user
-        return Favourites.objects.filter(user=self.request.user)
+        """Get comments for a specific recipe."""
+        recipe_id = self.kwargs.get('recipe_id')
+        return Comment.objects.filter(
+            recipe_id=recipe_id,
+            is_approved=True
+        ).select_related('user')
 
-class CommentsView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    def post(self, request, recipe_id, *args, **kwargs):
+    def perform_create(self, serializer):
+        """Create comment and notify recipe author."""
+        recipe_id = self.kwargs.get('recipe_id')
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        comment = serializer.save(recipe=recipe)
 
-        try:
-            recipe = Recipe.objects.get(id=recipe_id)
-        except Recipe.DoesNotExist:
-            return Response(
-                {'error':'Recipe does not exists'},
-                status=status.HTTP_404_NOT_FOUND
+        # Create notification for recipe author
+        if recipe.author != self.request.user:
+            Notification.create_notification(
+                user=recipe.author,
+                notification_type='comment',
+                description=f"{self.request.user.username} commented on your recipe: {recipe.title}",
+                actor=self.request.user,
+                content_type='comment',
+                object_id=comment.id,
             )
-        required_fields = ['comment_text', 'rating']
-        missing = [field for field in required_fields if not request.data.get(field)]
 
-        if missing:
-            return Response(
-                    {"error": f"Missing required fields: {', '.join(missing)}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
-       
+class RatingViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for recipe ratings/reviews.
+    One rating per user per recipe.
+    """
+    serializer_class = RatingSerializer
+    permission_classes = [CanRateRecipe]
+    filter_backends = [OrderingFilter]
+    ordering = ['-created_at']
 
-       
-        comment_text = request.data.get('comment_text')
-        rating = request.data.get('rating')
-            
-        
-
-        comment = Comments.objects.create(
-            user=request.user, 
-            recipe=recipe,
-            comment_text = comment_text,
-            rating = rating
-            
-            )
-        serializer = CommentsSerializer(comment)
-        return Response(
-            serializer.data,
-            status=status.HTTP_201_CREATED
-        )
-    
-class CommentsListView(APIView):
-    def get(self, request, recipe_id):
-
-        try:
-            recipe = Recipe.objects.get(id=recipe_id)
-        except Recipe.DoesNotExist:
-            return Response(
-                {'error':'Recipe does not exists'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        recipe_comments= Comments.objects.filter(recipe=recipe)
-        serializer = CommentsSerializer(recipe_comments, many=True)
-
-        return Response(
-            serializer.data,
-            status=status.HTTP_200_OK
-        )
-    
-class CommentsUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    serializer_class = CommentsSerializer
-    
     def get_queryset(self):
-        # Use the current logged-in user
-        return Favourites.objects.filter(user=self.request.user)
+        """Get ratings for a specific recipe."""
+        recipe_id = self.kwargs.get('recipe_id')
+        return Rating.objects.filter(recipe_id=recipe_id).select_related('user')
+
+    def get_serializer_context(self):
+        """Add recipe_id to context."""
+        context = super().get_serializer_context()
+        context['recipe_id'] = self.kwargs.get('recipe_id')
+        return context
+
+    def perform_create(self, serializer):
+        """Create rating and notify recipe author."""
+        recipe_id = self.kwargs.get('recipe_id')
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        rating = serializer.save(recipe=recipe)
+
+        # Create notification for recipe author
+        if recipe.author != self.request.user:
+            Notification.create_notification(
+                user=recipe.author,
+                notification_type='like',
+                description=f"{self.request.user.username} rated your recipe {rating.rating}⭐",
+                actor=self.request.user,
+                content_type='rating',
+                object_id=rating.id,
+            )
+
+
+class RecipeImageViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for recipe images.
+    """
+    serializer_class = RecipeImageSerializer
+    permission_classes = [IsRecipeAuthorOrReadOnly]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        """Get images for a specific recipe."""
+        recipe_id = self.kwargs.get('recipe_id')
+        return RecipeImage.objects.filter(recipe_id=recipe_id).order_by('order')
+
+    def perform_create(self, serializer):
+        """Create image for recipe."""
+        recipe_id = self.kwargs.get('recipe_id')
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        self.check_object_permissions(self.request, recipe)
+        serializer.save(recipe=recipe)
+
+
+class RecipeVersionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for recipe version history (read-only).
+    """
+    serializer_class = RecipeVersionSerializer
+    permission_classes = [IsPublicOrAuthor]
+
+    def get_queryset(self):
+        """Get versions for a specific recipe."""
+        recipe_id = self.kwargs.get('recipe_id')
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        # Check permission
+        if recipe.visibility != 'public' and recipe.author != self.request.user:
+            return RecipeVersion.objects.none()
+        return RecipeVersion.objects.filter(recipe_id=recipe_id).order_by('-version_number')
+
+
+class RecipeViewSet(viewsets.ModelViewSet):
+    """
+    Complete ViewSet for Recipe CRUD operations.
+    
+    Supports:
+    - Listing recipes (with filtering, searching, pagination)
+    - Creating recipes (authenticated users)
+    - Viewing recipe details
+    - Updating/deleting recipes (author only)
+    - Filtering by tags, difficulty, cook time
+    - Searching by title, description, ingredients
+    - Scaling ingredients to different serving sizes
+    - Managing recipe comments and ratings
+    """
+    permission_classes = [IsPublicOrAuthor, CanManageRecipes]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['difficulty', 'visibility', 'author']
+    search_fields = ['title', 'description', 'ingredients__name', 'tags__name']
+    ordering_fields = ['created_at', 'average_rating', 'cook_time', 'title']
+    ordering = ['-created_at']
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        """Get recipes based on visibility and permissions."""
+        user = self.request.user
+        if user.is_authenticated:
+            # Show public recipes + own recipes
+            return Recipe.objects.filter(
+                Q(visibility='public') | Q(author=user)
+            ).select_related('author').prefetch_related('tags', 'ingredients', 'ratings')
+        # Anonymous users see only public recipes
+        return Recipe.objects.filter(
+            visibility='public'
+        ).select_related('author').prefetch_related('tags', 'ingredients', 'ratings')
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if self.action == 'retrieve':
+            return RecipeDetailSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return RecipeCreateUpdateSerializer
+        elif self.action == 'scale_ingredients':
+            return RecipeScalePreviewSerializer
+        return RecipeListSerializer
+
+    def perform_create(self, serializer):
+        """Create recipe with current user as author."""
+        recipe = serializer.save(author=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve recipe and increment view count."""
+        recipe = self.get_object()
+        self.check_object_permissions(request, recipe)
+
+        # Increment view count for public recipes
+        if recipe.visibility == 'public':
+            recipe.increment_view_count()
+
+        serializer = self.get_serializer(recipe)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsRecipeAuthorOrReadOnly])
+    def publish(self, request, pk=None):
+        """
+        Publish a draft or pending recipe.
+        POST /recipes/<id>/publish/
+        """
+        recipe = self.get_object()
+        self.check_object_permissions(request, recipe)
+
+        if recipe.visibility in ['draft', 'pending']:
+            recipe.visibility = 'public'
+            recipe.save()
+            return Response(
+                {'message': 'Recipe published successfully', 'visibility': recipe.visibility},
+                status=status.HTTP_200_OK
+            )
+        return Response(
+            {'error': 'Only draft or pending recipes can be published'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    @action(detail=True, methods=['post'])
+    def scale_ingredients(self, request, pk=None):
+        """
+        Preview ingredients scaled to a different serving size.
+        POST /recipes/<id>/scale_ingredients/
+        Body: {"new_serving_size": 8}
+        """
+        recipe = self.get_object()
+        self.check_object_permissions(request, recipe)
+
+        serializer = RecipeScalePreviewSerializer(
+            request.data,
+            context={'recipe': recipe}
+        )
+        if serializer.is_valid():
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def versions(self, request, pk=None):
+        """
+        Get recipe edit history/versions.
+        GET /recipes/<id>/versions/
+        """
+        recipe = self.get_object()
+        self.check_object_permissions(request, recipe)
+
+        versions = recipe.versions.all().order_by('-version_number')
+        page = self.paginate_queryset(versions)
+        if page is not None:
+            serializer = RecipeVersionSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = RecipeVersionSerializer(versions, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def stats(self, request, pk=None):
+        """
+        Get recipe statistics.
+        GET /recipes/<id>/stats/
+        """
+        recipe = self.get_object()
+        self.check_object_permissions(request, recipe)
+
+        stats = {
+            'total_views': recipe.view_count,
+            'total_ratings': recipe.total_ratings,
+            'average_rating': recipe.average_rating,
+            'total_comments': recipe.comments.filter(is_approved=True).count(),
+            'favorites_count': recipe.favorited_by.count(),
+        }
+        return Response(stats, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def trending(self, request):
+        """
+        Get trending recipes (by views and ratings).
+        GET /recipes/trending/
+        """
+        recipes = Recipe.objects.filter(
+            visibility='public'
+        ).annotate(
+            rating_score=F('average_rating') * F('total_ratings')
+        ).order_by('-rating_score', '-view_count')[:20]
+
+        serializer = RecipeListSerializer(recipes, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def search_advanced(self, request):
+        """
+        Advanced recipe search with multiple filters.
+        GET /recipes/search_advanced/?tags=1,2&difficulty=easy&max_cook_time=30
+        """
+        queryset = self.get_queryset()
+
+        # Filter by tags
+        tags = request.query_params.get('tags', '').split(',')
+        if tags[0]:
+            queryset = queryset.filter(tags__id__in=[t for t in tags if t])
+
+        # Filter by difficulty
+        difficulty = request.query_params.get('difficulty')
+        if difficulty:
+            queryset = queryset.filter(difficulty=difficulty)
+
+        # Filter by cook time
+        max_cook_time = request.query_params.get('max_cook_time')
+        if max_cook_time:
+            try:
+                queryset = queryset.filter(cook_time__lte=int(max_cook_time))
+            except ValueError:
+                pass
+
+        # Filter by serving size
+        serving_size = request.query_params.get('serving_size')
+        if serving_size:
+            try:
+                queryset = queryset.filter(serving_size__gte=int(serving_size))
+            except ValueError:
+                pass
+
+        # Search by title or description
+        search_term = request.query_params.get('search', '')
+        if search_term:
+            queryset = queryset.filter(
+                Q(title__icontains=search_term) |
+                Q(description__icontains=search_term)
+            )
+
+        queryset = queryset.distinct()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = RecipeListSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = RecipeListSerializer(queryset, many=True, context={'request': request})
+        return Response(serializer.data)
