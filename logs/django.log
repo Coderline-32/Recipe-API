@@ -1,2 +1,4 @@
 INFO 2025-11-19 21:19:20,837 autoreload 2968 9172 Watching for file changes with StatReloader
 INFO 2025-11-19 21:19:58,528 autoreload 2968 9172 C:\Users\user1\Desktop\RecipemanagerAPI\RecipeAPI\RecipeAPI\settings.py changed, reloading.
+INFO 2025-11-19 21:20:00,597 autoreload 19176 6088 Watching for file changes with StatReloader
+INFO 2025-11-19 21:40:22,288 autoreload 22944 13476 Watching for file changes with StatReloader
