@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='favourites',
             name='created_at',
-            field=models.DateTimeField(auto_now_add=True, null=True),
+            field=models.DateTimeField(auto_now_add=True, blank=True),
         ),
         migrations.AlterUniqueTogether(
             name='favourites',
