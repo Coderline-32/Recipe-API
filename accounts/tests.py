@@ -5,7 +5,7 @@ from rest_framework import status
 from datetime import datetime
 
 from .models import User, Message, Follow, Favorite, Notification
-from recipes.models import Recipe  # Assuming recipes app exists
+from recipe.models import Recipe  # Assuming recipe app exists
 
 
 class UserModelTestCase(TestCase):
@@ -110,7 +110,7 @@ class UserRegistrationAPITestCase(APITestCase):
     def setUp(self):
         """Set up test client."""
         self.client = APIClient()
-        self.register_url = '/users/register/'
+        self.register_url = '/api/v1/users/register/'
 
     def test_user_registration_success(self):
         """Test successful user registration."""
@@ -185,7 +185,7 @@ class UserLoginAPITestCase(APITestCase):
     def setUp(self):
         """Set up test client and user."""
         self.client = APIClient()
-        self.login_url = '/users/login/'
+        self.login_url = '/api/v1/users/login/'
         self.user = User.objects.create_user(
             username='testuser',
             email='test@example.com',
@@ -241,7 +241,7 @@ class UserProfileAPITestCase(APITestCase):
 
     def test_get_user_profile(self):
         """Test retrieving user profile."""
-        url = f'/users/{self.user.id}/'
+        url = f'/api/v1/users/{self.user.id}/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['username'], 'testuser')
@@ -249,7 +249,7 @@ class UserProfileAPITestCase(APITestCase):
     def test_update_own_profile(self):
         """Test updating own profile."""
         self.client.force_authenticate(user=self.user)
-        url = f'/users/{self.user.id}/'
+        url = f'/api/v1/users/{self.user.id}/'
         data = {
             'bio': 'Updated bio',
             'social_links': {'twitter': 'https://twitter.com/testuser'}
@@ -262,7 +262,7 @@ class UserProfileAPITestCase(APITestCase):
     def test_cannot_update_others_profile(self):
         """Test that user cannot update others' profile."""
         self.client.force_authenticate(user=self.user)
-        url = f'/users/{self.other_user.id}/'
+        url = f'/api/v1/users/{self.other_user.id}/'
         data = {'bio': 'Hacked bio'}
         response = self.client.put(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -288,7 +288,7 @@ class FollowAPITestCase(APITestCase):
     def test_follow_user(self):
         """Test following a user via API."""
         self.client.force_authenticate(user=self.user)
-        url = f'/users/{self.target_user.id}/follow/'
+        url = f'/api/v1/users/{self.target_user.id}/follow/'
         response = self.client.post(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(self.user.is_following(self.target_user))
@@ -296,7 +296,7 @@ class FollowAPITestCase(APITestCase):
     def test_cannot_follow_self(self):
         """Test that user cannot follow themselves."""
         self.client.force_authenticate(user=self.user)
-        url = f'/users/{self.user.id}/follow/'
+        url = f'/api/v1/users/{self.user.id}/follow/'
         response = self.client.post(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
@@ -304,7 +304,7 @@ class FollowAPITestCase(APITestCase):
         """Test unfollowing a user."""
         self.user.follow(self.target_user)
         self.client.force_authenticate(user=self.user)
-        url = f'/users/{self.target_user.id}/follow/'
+        url = f'/api/v1/users/{self.target_user.id}/follow/'
         response = self.client.delete(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(self.user.is_following(self.target_user))
@@ -330,7 +330,7 @@ class MessagingAPITestCase(APITestCase):
     def test_send_message(self):
         """Test sending a message."""
         self.client.force_authenticate(user=self.sender)
-        url = f'/users/{self.sender.id}/messages/'
+        url = f'/api/v1/users/{self.sender.id}/messages/'
         data = {
             'receiver': self.receiver.id,
             'content': 'Hello, receiver!'
@@ -351,7 +351,7 @@ class MessagingAPITestCase(APITestCase):
             content='Test message'
         )
         self.client.force_authenticate(user=self.receiver)
-        url = f'/users/{self.receiver.id}/messages/'
+        url = f'/api/v1/users/{self.receiver.id}/messages/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreater(len(response.data['results']), 0)
@@ -364,7 +364,7 @@ class MessagingAPITestCase(APITestCase):
             content='Test message'
         )
         self.client.force_authenticate(user=self.receiver)
-        url = f'/users/{self.receiver.id}/messages/{message.id}/'
+        url = f'/api/v1/users/{self.receiver.id}/messages/{message.id}/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         message.refresh_from_db()
@@ -386,7 +386,7 @@ class GDPRTestCase(APITestCase):
     def test_gdpr_data_export(self):
         """Test GDPR data export."""
         self.client.force_authenticate(user=self.user)
-        url = '/users/gdpr/export/'
+        url = '/api/v1/users/gdpr/export/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('user', response.data)
@@ -396,7 +396,7 @@ class GDPRTestCase(APITestCase):
         """Test GDPR account deletion."""
         self.client.force_authenticate(user=self.user)
         user_id = self.user.id
-        url = '/users/gdpr/delete/'
+        url = '/api/v1/users/gdpr/delete/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(User.objects.filter(pk=user_id).exists())

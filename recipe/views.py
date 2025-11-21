@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status, views
 from rest_framework.decorators import action
+from django.utils.decorators import method_decorator
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
@@ -7,6 +8,8 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q, Avg, F
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from django.core.cache import cache
+from django.views.decorators.cache import cache_page
 
 from .models import Recipe, Ingredient, Tag, Comment, Rating, RecipeImage, RecipeVersion
 from .serializers import (
@@ -28,7 +31,7 @@ from .permissions import (
     CanRateRecipe,
     CanManageRecipes,
 )
-from users.models import Notification
+from accounts.models import Notification
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -204,17 +207,29 @@ class RecipeViewSet(viewsets.ModelViewSet):
     lookup_field = 'id'
 
     def get_queryset(self):
-        """Get recipes based on visibility and permissions."""
+        """Get recipes based on visibility and permissions with selective prefetching."""
         user = self.request.user
         if user.is_authenticated:
             # Show public recipes + own recipes
-            return Recipe.objects.filter(
+            queryset = Recipe.objects.filter(
                 Q(visibility='public') | Q(author=user)
-            ).select_related('author').prefetch_related('tags', 'ingredients', 'ratings')
-        # Anonymous users see only public recipes
-        return Recipe.objects.filter(
-            visibility='public'
-        ).select_related('author').prefetch_related('tags', 'ingredients', 'ratings')
+            ).select_related('author').prefetch_related('tags', 'ingredients')
+        else:
+            # Anonymous users see only public recipes
+            queryset = Recipe.objects.filter(
+                visibility='public'
+            ).select_related('author').prefetch_related('tags', 'ingredients')
+
+        # For detail views, prefetch additional related objects to avoid N+1 queries
+        if self.action == 'retrieve':
+            queryset = queryset.prefetch_related('images', 'comments', 'versions', 'ratings')
+
+        return queryset
+
+    @method_decorator(cache_page(300))  # Cache for 5 minutes
+    def list(self, request, *args, **kwargs):
+        """List recipes with caching for performance."""
+        return super().list(request, *args, **kwargs)
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -318,16 +333,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response(stats, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'])
+    @method_decorator(cache_page(300))  # Cache for 5 minutes
     def trending(self, request):
         """
         Get trending recipes (by views and ratings).
         GET /recipes/trending/
         """
-        recipes = Recipe.objects.filter(
-            visibility='public'
-        ).annotate(
-            rating_score=F('average_rating') * F('total_ratings')
-        ).order_by('-rating_score', '-view_count')[:20]
+        cache_key = 'trending_recipes'
+        recipes = cache.get(cache_key)
+        if recipes is None:
+            recipes = Recipe.objects.filter(
+                visibility='public'
+            ).annotate(
+                rating_score=F('average_rating') * F('total_ratings')
+            ).order_by('-rating_score', '-view_count')[:20]
+            cache.set(cache_key, recipes, 300)  # Cache for 5 minutes
 
         serializer = RecipeListSerializer(recipes, many=True, context={'request': request})
         return Response(serializer.data)
@@ -374,7 +394,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 Q(description__icontains=search_term)
             )
 
-        queryset = queryset.distinct()
+        # Remove distinct() as it's often unnecessary and slow; ensure unique results via query optimization
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = RecipeListSerializer(page, many=True, context={'request': request})

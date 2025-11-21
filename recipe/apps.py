@@ -9,7 +9,7 @@ class RecipesConfig(AppConfig):
     ratings, media uploads, and recipe versioning for the Recipe API.
     """
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'recipes'
+    name = 'recipe'
     verbose_name = 'recipe'
 
     def ready(self):

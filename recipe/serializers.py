@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.db.models import Avg
 from .models import Recipe, Ingredient, Tag, Comment, Rating, RecipeImage, RecipeVersion
-from users.serializers import UserMinimalSerializer
+from accounts.serializers import UserMinimalSerializer
 
 
 class TagSerializer(serializers.ModelSerializer):

@@ -9,7 +9,7 @@ class UsersConfig(AppConfig):
     messaging, and GDPR compliance for the Recipe API.
     """
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'users'
+    name = 'accounts'
     verbose_name = 'Users & Authentication'
 
     def ready(self):

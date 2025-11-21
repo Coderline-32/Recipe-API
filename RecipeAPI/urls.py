@@ -14,12 +14,16 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 
 # Health check endpoint
 class HealthCheckView(APIView):
     """Simple health check endpoint."""
     def get(self, request):
         """Return API health status."""
+
+        permission_classes = [AllowAny]
+        
         return Response(
             {
                 'status': 'ok',
@@ -68,32 +72,32 @@ urlpatterns = [
     # ============================================================================
     # API - USERS
     # ============================================================================
-    path('api/v1/users/', include('users.urls', namespace='users')),
+    path('api/v1/users/', include('accounts.urls', namespace='users')),
 
     # ============================================================================
     # API - RECIPES
     # ============================================================================
-    path('api/v1/recipes/', include('recipes.urls', namespace='recipes')),
+    path('api/v1/recipes/', include('recipe.urls', namespace='recipes')),
 
     # ============================================================================
     # API DOCUMENTATION
     # ============================================================================
     # OpenAPI 3.0 schema
-    path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
+    #path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
 
     # Swagger UI
-    path(
-        'api/v1/docs/',
-        SpectacularSwaggerView.as_view(url_name='schema'),
-        name='swagger-ui'
-    ),
+   # path(
+    #    'api/v1/docs/',
+    #    SpectacularSwaggerView.as_view(url_name='schema'),
+    #    name='swagger-ui'
+    #),
 
     # ReDoc
-    path(
-        'api/v1/docs/redoc/',
-        SpectacularRedocView.as_view(url_name='schema'),
-        name='redoc'
-    ),
+    #path(
+     #   'api/v1/docs/redoc/',
+     #   SpectacularRedocView.as_view(url_name='schema'),
+     #   name='redoc'
+    #),
 ]
 
 # ============================================================================

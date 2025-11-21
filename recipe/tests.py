@@ -6,7 +6,7 @@ from decimal import Decimal
 from datetime import datetime
 
 from .models import Recipe, Ingredient, Tag, Comment, Rating, RecipeImage, RecipeVersion
-from users.models import Notification
+from accounts.models import Notification
 
 User = get_user_model()
 
@@ -560,7 +560,7 @@ class RecipeAPITestCase(APITestCase):
 
     def test_list_public_recipes(self):
         """Test listing public recipes."""
-        response = self.client.get('/recipes/')
+        response = self.client.get('/api/v1/recipes/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('results', response.data)
 
@@ -576,7 +576,7 @@ class RecipeAPITestCase(APITestCase):
             'instructions': ['Step 1', 'Step 2'],
             'tag_ids': []
         }
-        response = self.client.post('/recipes/', data, format='json')
+        response = self.client.post('/api/v1/recipes/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Recipe.objects.filter(title='New Recipe').exists())
 
@@ -587,12 +587,12 @@ class RecipeAPITestCase(APITestCase):
             'cook_time': 30,
             'instructions': []
         }
-        response = self.client.post('/recipes/', data, format='json')
+        response = self.client.post('/api/v1/recipes/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_retrieve_public_recipe(self):
         """Test retrieving a public recipe."""
-        response = self.client.get(f'/recipes/{self.recipe.id}/')
+        response = self.client.get(f'/api/v1/recipes/{self.recipe.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], 'Pasta Carbonara')
 
@@ -600,7 +600,7 @@ class RecipeAPITestCase(APITestCase):
         """Test updating own recipe."""
         self.client.force_authenticate(user=self.user)
         data = {'description': 'Updated description'}
-        response = self.client.patch(f'/recipes/{self.recipe.id}/', data, format='json')
+        response = self.client.patch(f'/api/v1/recipes/{self.recipe.id}/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.recipe.refresh_from_db()
         self.assertEqual(self.recipe.description, 'Updated description')
@@ -609,21 +609,21 @@ class RecipeAPITestCase(APITestCase):
         """Test that user cannot update others' recipes."""
         self.client.force_authenticate(user=self.other_user)
         data = {'description': 'Hacked'}
-        response = self.client.patch(f'/recipes/{self.recipe.id}/', data, format='json')
+        response = self.client.patch(f'/api/v1/recipes/{self.recipe.id}/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_delete_own_recipe(self):
         """Test deleting own recipe."""
         recipe_id = self.recipe.id
         self.client.force_authenticate(user=self.user)
-        response = self.client.delete(f'/recipes/{recipe_id}/')
+        response = self.client.delete(f'/api/v1/recipes/{recipe_id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Recipe.objects.filter(id=recipe_id).exists())
 
     def test_cannot_delete_others_recipe(self):
         """Test that user cannot delete others' recipes."""
         self.client.force_authenticate(user=self.other_user)
-        response = self.client.delete(f'/recipes/{self.recipe.id}/')
+        response = self.client.delete(f'/api/v1/recipes/{self.recipe.id}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_publish_draft_recipe(self):
@@ -636,7 +636,7 @@ class RecipeAPITestCase(APITestCase):
             instructions=[]
         )
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(f'/recipes/{draft_recipe.id}/publish/', format='json')
+        response = self.client.post(f'/api/v1/recipes/{draft_recipe.id}/publish/', format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         draft_recipe.refresh_from_db()
         self.assertEqual(draft_recipe.visibility, 'public')
@@ -644,7 +644,7 @@ class RecipeAPITestCase(APITestCase):
     def test_cannot_publish_already_public_recipe(self):
         """Test that already public recipes cannot be published again."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(f'/recipes/{self.recipe.id}/publish/', format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/publish/', format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_scale_ingredients_endpoint(self):
@@ -657,32 +657,32 @@ class RecipeAPITestCase(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
         data = {'new_serving_size': 8}
-        response = self.client.post(f'/recipes/{self.recipe.id}/scale-ingredients/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/scale-ingredients/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('scaled_ingredients', response.data)
 
     def test_recipe_stats_endpoint(self):
         """Test recipe stats endpoint."""
-        response = self.client.get(f'/recipes/{self.recipe.id}/stats/')
+        response = self.client.get(f'/api/v1/recipes/{self.recipe.id}/stats/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('total_views', response.data)
         self.assertIn('average_rating', response.data)
 
     def test_trending_recipes_endpoint(self):
         """Test trending recipes endpoint."""
-        response = self.client.get('/recipes/trending/')
+        response = self.client.get('/api/v1/recipes/trending/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_search_advanced_endpoint(self):
         """Test advanced search endpoint."""
-        response = self.client.get('/recipes/search-advanced/?search=Pasta&difficulty=easy')
+        response = self.client.get('/api/v1/recipes/search-advanced/?search=Pasta&difficulty=easy')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('results', response.data)
 
     def test_recipe_versions_endpoint(self):
         """Test recipe versions endpoint."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(f'/recipes/{self.recipe.id}/versions/')
+        response = self.client.get(f'/api/v1/recipes/{self.recipe.id}/versions/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
@@ -714,14 +714,14 @@ class CommentAPITestCase(APITestCase):
         """Test creating a comment as authenticated user."""
         self.client.force_authenticate(user=self.user)
         data = {'content': 'Great recipe!'}
-        response = self.client.post(f'/recipes/{self.recipe.id}/comments/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/comments/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Comment.objects.filter(content='Great recipe!').exists())
 
     def test_create_comment_anonymous(self):
         """Test that anonymous users cannot create comments."""
         data = {'content': 'Great recipe!'}
-        response = self.client.post(f'/recipes/{self.recipe.id}/comments/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/comments/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_list_comments(self):
@@ -731,7 +731,7 @@ class CommentAPITestCase(APITestCase):
             user=self.user,
             content='Great!'
         )
-        response = self.client.get(f'/recipes/{self.recipe.id}/comments/')
+        response = self.client.get(f'/api/v1/recipes/{self.recipe.id}/comments/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreater(len(response.data['results']), 0)
 
@@ -739,14 +739,14 @@ class CommentAPITestCase(APITestCase):
         """Test that empty comments are rejected."""
         self.client.force_authenticate(user=self.user)
         data = {'content': '   '}
-        response = self.client.post(f'/recipes/{self.recipe.id}/comments/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/comments/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_comment_too_long_validation(self):
         """Test that very long comments are rejected."""
         self.client.force_authenticate(user=self.user)
         data = {'content': 'x' * 5001}
-        response = self.client.post(f'/recipes/{self.recipe.id}/comments/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/comments/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
@@ -778,13 +778,13 @@ class RatingAPITestCase(APITestCase):
         """Test creating a rating as authenticated user."""
         self.client.force_authenticate(user=self.user)
         data = {'rating': 5, 'review': 'Excellent!'}
-        response = self.client.post(f'/recipes/{self.recipe.id}/ratings/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/ratings/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_rating_anonymous(self):
         """Test that anonymous users cannot rate."""
         data = {'rating': 5}
-        response = self.client.post(f'/recipes/{self.recipe.id}/ratings/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/ratings/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_update_rating(self):
@@ -792,12 +792,12 @@ class RatingAPITestCase(APITestCase):
         self.client.force_authenticate(user=self.user)
         # Create initial rating
         data = {'rating': 3}
-        response = self.client.post(f'/recipes/{self.recipe.id}/ratings/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/ratings/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # Update rating
         data = {'rating': 5}
-        response = self.client.post(f'/recipes/{self.recipe.id}/ratings/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/ratings/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # Verify only one rating exists
@@ -807,14 +807,14 @@ class RatingAPITestCase(APITestCase):
         """Test that invalid rating values are rejected."""
         self.client.force_authenticate(user=self.user)
         data = {'rating': 10}
-        response = self.client.post(f'/recipes/{self.recipe.id}/ratings/', data, format='json')
+        response = self.client.post(f'/api/v1/recipes/{self.recipe.id}/ratings/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_recipe_average_rating_updated(self):
         """Test that recipe average rating is updated after rating."""
         self.client.force_authenticate(user=self.user)
         data = {'rating': 5}
-        self.client.post(f'/recipes/{self.recipe.id}/ratings/', data, format='json')
+        self.client.post(f'/api/v1/recipes/{self.recipe.id}/ratings/', data, format='json')
 
         self.recipe.refresh_from_db()
         self.assertEqual(self.recipe.average_rating, 5.0)
@@ -827,7 +827,7 @@ class RatingAPITestCase(APITestCase):
             recipe=self.recipe,
             rating=5
         )
-        response = self.client.get(f'/recipes/{self.recipe.id}/ratings/')
+        response = self.client.get(f'/api/v1/recipes/{self.recipe.id}/ratings/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreater(len(response.data['results']), 0)
 

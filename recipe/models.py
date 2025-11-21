@@ -101,7 +101,9 @@ class Recipe(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='recipes',
-        help_text="Author of the recipe"
+        help_text="Author of the recipe",
+        blank=True,
+        null=True
     )
 
     # Cooking Details
@@ -203,6 +205,10 @@ class Recipe(models.Model):
             models.Index(fields=['slug']),
             models.Index(fields=['-average_rating']),
             models.Index(fields=['difficulty']),
+            models.Index(fields=['title']),
+            models.Index(fields=['description']),
+            models.Index(fields=['cook_time']),
+            models.Index(fields=['serving_size']),
         ]
         permissions = [
             ('approve_recipe', 'Can approve pending recipes'),

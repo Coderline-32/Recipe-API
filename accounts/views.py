@@ -345,10 +345,12 @@ class MessagingViewSet(viewsets.ViewSet):
             )
 
         message = get_object_or_404(
-            Message,
-            pk=message_id,
-            Q(sender=request.user) | Q(receiver=request.user)
+            Message.objects.filter(
+                Q(pk=message_id) &
+                (Q(sender=request.user) | Q(receiver=request.user))
+            )
         )
+
 
         if request.method == 'GET':
             if message.receiver == request.user:

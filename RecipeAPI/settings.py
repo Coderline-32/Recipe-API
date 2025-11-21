@@ -12,7 +12,7 @@ import environ
 
 # Initialize environment variables
 env = environ.Env(
-    DEBUG=(bool, False)
+    DEBUG=(bool, True)
 )
 environ.Env.read_env()
 
@@ -45,8 +45,8 @@ INSTALLED_APPS = [
     'django_extensions',
 
     # Local apps
-    'users.apps.UsersConfig',
-    # 'recipes.apps.RecipesConfig',  # Uncomment when recipes app is ready
+    'accounts.apps.UsersConfig',
+    'recipe.apps.RecipesConfig', 
 ]
 
 MIDDLEWARE = [
@@ -60,7 +60,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = 'RecipeAPI.urls'
 
 TEMPLATES = [
     {
@@ -78,7 +78,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = 'RecipeAPI.wsgi.application'
 
 # Database
 DATABASES = {
@@ -141,7 +141,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CUSTOM USER MODEL
 # ============================================================================
 # Use custom User model from users app
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = 'accounts.User'
 
 # ============================================================================
 # DJANGO REST FRAMEWORK CONFIGURATION
@@ -191,7 +191,7 @@ REST_FRAMEWORK = {
     'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata',
 
     # Error Handling
-    'EXCEPTION_HANDLER': 'api.exceptions.custom_exception_handler',
+    #'EXCEPTION_HANDLER': 'api.exceptions.custom_exception_handler',
 
     # Datetime Format
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
@@ -297,6 +297,11 @@ CACHES = {
     }
 }
 
+# Cache settings for API performance
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 300  # 5 minutes
+CACHE_MIDDLEWARE_KEY_PREFIX = 'recipe_api'
+
 # ============================================================================
 # LOGGING CONFIGURATION
 # ============================================================================
@@ -308,52 +313,27 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse',
-        },
-        'require_debug_true': {
-            '()': 'django.utils.log.RequireDebugTrue',
-        },
+        # ... keep your formatters ...
     },
     'handlers': {
         'console': {
-            'level': 'INFO',
+            'level': 'DEBUG', # <--- Change this to DEBUG
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOGS_DIR / 'django.log',
-            'maxBytes': 1024 * 1024 * 5,  # 5MB
-            'backupCount': 5,
-            'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'INFO',
-            'propagate': False,
         },
-        'django.request': {
-            'handlers': ['file'],
-            'level': 'ERROR',
+        # Add this specific logger for SQL
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'DEBUG', # <--- This prints the SQL
             'propagate': False,
         },
     },
 }
-
 # ============================================================================
 # SECURITY SETTINGS (For Production)
 # ============================================================================
@@ -398,3 +378,4 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/recipe_api
 CACHE_BACKEND=django_redis.cache.RedisCache      # Optional, defaults to LocMemCache
 CORS_ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
 """
+
